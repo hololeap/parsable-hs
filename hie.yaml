@@ -2,6 +2,3 @@ cradle:
   cabal:
     - path: "src"
       component: "lib:parsable"
-
-    - path: "test"
-      component: "parsable:test:parsable-test"
