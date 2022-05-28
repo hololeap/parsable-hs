@@ -29,9 +29,12 @@ instructions on how to use these extensions.
 
 {-# Language ConstrainedClassMethods #-}
 {-# Language DefaultSignatures #-}
+{-# Language DeriveGeneric #-}
 {-# Language DeriveTraversable #-}
+{-# Language DerivingVia #-}
 {-# Language FlexibleContexts #-}
 {-# Language FlexibleInstances #-}
+{-# Language GeneralizedNewtypeDeriving #-}
 {-# Language LambdaCase #-}
 {-# Language ScopedTypeVariables #-}
 {-# Language TypeApplications #-}
@@ -45,12 +48,16 @@ module Data.Parsable
     (
     -- * Parsing
       Parsable(..)
+    , parserValue
+    , parserValue'
     , runParsable
     , runParsable'
+    , NaturalParsable(..)
     -- ** Partial parses
     , PartialParse(..)
     , getPartialParse
     , isCompleteParse
+    , partialParses
     -- ** Parsing functions
     , satisfyAny
     , someAllowed
@@ -59,6 +66,7 @@ module Data.Parsable
     , endPartial
     -- * Printing
     , Printable(..)
+    , ShowPrintable(..)
     , toText
     -- * Re-exports
     , module Data.Char
@@ -67,15 +75,25 @@ module Data.Parsable
     , module Data.String
     , module Text.Parsec
     , module Control.Applicative
+    , module Data.Functor.Slim.Apply
     ) where
 
 import Control.Applicative (some)
 import Data.Char
+import Data.Functor.Slim.Apply
 import Data.Functor.Identity
 import Data.Kind
+import Data.List.NonEmpty (NonEmpty)
+import qualified Data.List.NonEmpty as NE
+import Data.Semigroup
 import Data.String
 import Data.Text (Text, unpack)
+import GHC.Generics
 import Text.Parsec
+-- import Text.Parsec.Token (GenTokenParser(natural))
+-- import Text.Parsec.Language (haskell)
+
+
 
 -- | If a parse succeeds for the beginning of the input, but then fails, we
 --   wrap the successful part in the v'PartialParse' constructor. If the entire
@@ -89,7 +107,17 @@ data PartialParse t
         String -- ^ The unparsed remainder. Useful for error messages
         t
     | CompleteParse t
-    deriving (Show, Eq, Ord, Functor, Foldable, Traversable)
+    deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic, Generic1)
+    deriving Semigroup via (Ap' PartialParse t)
+
+--   The general idea is that if many parses end with a v'CompleteParse', the
+--   entire sequence of parses is itself a v'CompleteParse'. The opposite holds
+--   for v'PartialParse' as well.
+instance Apply PartialParse where
+    CompleteParse  f <.> CompleteParse  x = CompleteParse  (f x)
+    PartialParse _ f <.> CompleteParse  x = CompleteParse  (f x)
+    CompleteParse  f <.> PartialParse s x = PartialParse s (f x)
+    PartialParse _ f <.> PartialParse s x = PartialParse s (f x)
 
 -- | Extract the data from a 'PartialParse'
 getPartialParse :: PartialParse t -> t
@@ -102,6 +130,11 @@ isCompleteParse :: PartialParse t -> Bool
 isCompleteParse = \case
     PartialParse _ _ -> False
     CompleteParse _ -> True
+
+-- | Condense a non-empty list of 'PartialParse's to a single 'PartialParse'
+--   carrying a non-empty list. Similar to 'sequence'.
+partialParses :: NonEmpty (PartialParse a) -> PartialParse (NonEmpty a)
+partialParses = sconcat . fmap (fmap NE.singleton)
 
 -- | Represents types that have a valid Parsec parser.
 class Parsable t where
@@ -128,6 +161,18 @@ class Parsable t where
 
     {-# Minimal parser | parser' #-}
 
+-- | Extract the 'PartialParse' value when running 'parser'. This can be
+--   convenient when it doesn't matter if it was a v'PartialParse' or a
+--   v'CompleteParse'.
+parserValue :: (Parsable t, ParsableInput t ~ (), Stream s Identity Char)
+    => Parsec s () t
+parserValue = getPartialParse <$> parser
+
+-- | The same as 'parserValue', but takes 'ParsableInput'.
+parserValue' :: (Parsable t, Stream s Identity Char)
+    => ParsableInput t -> Parsec s () t
+parserValue' = fmap getPartialParse . parser'
+
 -- | Convenience method to run a 'Parsable' parser.
 runParsable :: forall t s. (Parsable t, Stream s Identity Char, ParsableInput t ~ ())
     => SourceName -- ^ Only used in error messages and may be the empty string
@@ -142,6 +187,15 @@ runParsable' :: forall t s. (Parsable t, Stream s Identity Char)
     -> s
     -> Either ParseError (PartialParse t)
 runParsable' i = parse (parser' @t i)
+
+newtype NaturalParsable a = NaturalParsable
+    { unwrapNaturalParsable :: a }
+    deriving (Read, Show, Eq, Ord, Num)
+
+instance Read a => Parsable (NaturalParsable a) where
+    parser = (<?> "natural number") $ endPartial $ do
+        x <- some digit
+        pure $ read x
 
 -- | Parse a Char that satisfies any of the given predicates
 satisfyAny :: Stream s Identity Char => [Char -> Bool] -> Parsec s u Char
@@ -242,3 +296,13 @@ instance Printable Text where
 -- | Convenience method that will turn a 'Printable' to any 'IsString'.
 toText :: (Printable t, IsString s) => t -> s
 toText = fromString . toString
+
+-- | Wrapper for types that inherit 'toString' directly from their 'Show' instance.
+--
+--   It is convenient to use the @DerivingVia@ language extension with this.
+newtype ShowPrintable a = ShowPrintable {
+    unwrapShowPrintable :: a
+} deriving (Read, Show, Eq, Ord, Num, IsString)
+
+instance Show a => Printable (ShowPrintable a) where
+    toString = show . unwrapShowPrintable

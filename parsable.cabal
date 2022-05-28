@@ -12,13 +12,19 @@ license-file:       LICENSE
 author:             hololeap
 maintainer:         hololeap@users.noreply.github.com
 
--- copyright:
+copyright:          Copyright (C) 2022 hololeap
 category:           Text
 extra-source-files: CHANGELOG.md
 
 source-repository head
     type:           git
     location:       https://github.com/hololeap/parsable-hs
+    branch:         main
+
+flag pedantic
+    description:    Turn on -Werror
+    default:        False
+    manual:         True
 
 common all
     ghc-options:         -Weverything
@@ -35,11 +41,14 @@ common all
                          -Wno-missing-deriving-strategies
                          -Wno-deriving-typeable
                          -foptimal-applicative-do
+    if flag(pedantic)
+        ghc-options:     -Werror
 
 library
     import: all
     exposed-modules:
         , Data.Parsable
+
 
     other-extensions:
         , ConstrainedClassMethods
@@ -53,6 +62,40 @@ library
     build-depends:
         , base >=4.13 && <5
         , parsec >=3.1.14.0
+        , semigroupoids-slim
         , text >=1.2.4.0
     hs-source-dirs:   src
     default-language: Haskell2010
+
+    other-extensions:
+        , ConstrainedClassMethods
+        , DefaultSignatures
+        , DeriveGeneric
+        , DeriveTraversable
+        , DerivingVia
+        , FlexibleContexts
+        , FlexibleInstances
+        , GeneralizedNewtypeDeriving
+        , LambdaCase
+        , ScopedTypeVariables
+        , TypeApplications
+        , TypeFamilies
+
+test-suite parsable-test
+    import: all
+    default-language: Haskell2010
+    type:             exitcode-stdio-1.0
+    hs-source-dirs:   test
+    main-is:          Main.hs
+    build-depends:
+        , base
+        , parsable
+        , QuickCheck
+        , quickcheck-classes
+        , semigroupoids-slim
+        , semigroupoids >=5.3.6
+
+    other-extensions:
+        , DerivingStrategies
+        , InstanceSigs
+        , TypeApplications
