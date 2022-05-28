@@ -3,6 +3,8 @@ name:               parsable
 version:            0.1.0.0
 synopsis:           Parsable and Printable classes
 
+tested-with:        GHC == { 8.8.4, 8.10.7, 9.0.2, 9.2.2 }
+
 -- description:
 homepage:           https://github.com/hololeap/parsable-hs
 bug-reports:        https://github.com/hololeap/parsable-hs/issues
@@ -27,19 +29,7 @@ flag pedantic
     manual:         True
 
 common all
-    ghc-options:         -Weverything
-                         -Wno-missing-exported-signatures
-                         -Wno-missing-import-lists
-                         -Wno-missed-specialisations
-                         -Wno-all-missed-specialisations
-                         -Wno-unsafe
-                         -Wno-safe
-                         -Wno-missing-safe-haskell-mode
-                         -Wno-missing-local-signatures
-                         -Wno-implicit-prelude
-                         -Wno-prepositive-qualified-module
-                         -Wno-missing-deriving-strategies
-                         -Wno-deriving-typeable
+    ghc-options:         -Wall
                          -foptimal-applicative-do
     if flag(pedantic)
         ghc-options:     -Werror
