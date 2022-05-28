@@ -84,8 +84,7 @@ import Data.Functor.Slim.Apply
 import Data.Functor.Identity
 import Data.Kind
 import Data.List.NonEmpty (NonEmpty)
-import qualified Data.List.NonEmpty as NE
-import Data.Semigroup
+import Data.Semigroup.Slim.Traversable
 import Data.String
 import Data.Text (Text, unpack)
 import GHC.Generics
@@ -132,9 +131,9 @@ isCompleteParse = \case
     CompleteParse _ -> True
 
 -- | Condense a non-empty list of 'PartialParse's to a single 'PartialParse'
---   carrying a non-empty list. Similar to 'sequence'.
+--   carrying a non-empty list. Equivalent to 'sequence1'.
 partialParses :: NonEmpty (PartialParse a) -> PartialParse (NonEmpty a)
-partialParses = sconcat . fmap (fmap NE.singleton)
+partialParses = sequence1
 
 -- | Represents types that have a valid Parsec parser.
 class Parsable t where
